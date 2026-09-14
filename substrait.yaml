@@ -2,8 +2,8 @@
 # Replace the description when you change what the app does — the deploy
 # check rejects the scaffold's placeholder text.
 description: >
-  A starter internal tool for Ninja Van teams, built during the AI Champions
-  programme. Serves a single web page and a small JSON API.
+  A lightweight, interactive CRM for tracking sales leads, customer contacts,
+  deal pipeline stages, and revenue metrics.
 
 # No database is declared, so none is provisioned and the app stores nothing
 # between visits. To add one later, uncomment the line below and ask your AI
