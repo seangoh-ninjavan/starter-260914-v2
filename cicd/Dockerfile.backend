@@ -1,5 +1,14 @@
 FROM python:3.12-slim
 
+# Security patches: CVE-2026-41992 (gzip), CVE-2026-86145/89161 (libpcre2-8-0),
+# CVE-2026-11822/11824 (libsqlite3-0), CVE-2026-13221/42496/8376/42497/48962/57432/57433 (perl-base)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gzip=1.13-1+deb13u1 \
+    libpcre2-8-0=10.46-1~deb13u2 \
+    libsqlite3-0=3.46.1-7+deb13u2 \
+    perl-base=5.40.1-6+deb13u1 \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 COPY backend/requirements.txt ./requirements.txt
