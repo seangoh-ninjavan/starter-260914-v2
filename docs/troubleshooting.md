@@ -69,5 +69,10 @@ bash substrait.sh logs --previous               # last terminated instance's log
   reading the log from just before it died. That is usually where the real error is.
 - **Read the deepest application frame** in a Python traceback — the file and line inside your
   app, not inside the framework. A 500 is almost never the framework's fault.
+- **`host not found in upstream "backend"`** (nginx, frontend crash-looping) — the frontend's
+  nginx config is proxying to a docker-compose service name. On the platform `/api` is routed
+  by the ingress and never reaches nginx, so that `proxy_pass`/`upstream` block must not be
+  there. The deploy now rejects this at VALIDATING, but older deploys may still have it.
+  Remove the block and redeploy — see `docs/frontend.md`.
 - If the pods are healthy and the log shows nothing at the time of the failure, say that —
   the request may not be reaching the app at all. Don't invent a cause.

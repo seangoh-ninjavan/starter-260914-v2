@@ -5,7 +5,7 @@ nothing — the service won't exist and the app will crash at runtime with no bu
 
 ```yaml
 services:
-  object-storage: {}     # → OBJECT_STORAGE_BUCKET (private GCS bucket, no credential needed)
+  object-storage: {}     # → OBJECT_STORAGE_BUCKET (private GCS bucket, one per environment)
   redis: {}              # → REDIS_URL=redis://redis:6379/0
   kafka:                 # → KAFKA_BROKERS=kafka:9092 (single-node Redpanda, Kafka-compatible)
     persistent: true

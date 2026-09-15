@@ -6,7 +6,10 @@ exports.
 
 ## What you get
 
-- **One private bucket per app**, injected as **`OBJECT_STORAGE_BUCKET`**.
+- **One private bucket per app, per environment**, injected as **`OBJECT_STORAGE_BUCKET`**.
+  An app with `production` and `staging` has two buckets and two identities; each pod can
+  reach only its own environment's, so a staging deploy can never read or overwrite
+  production's files.
 - **No credential.** The pod authenticates as itself (Workload Identity). There is no key to
   mount, no secret to rotate, and **nothing about storage belongs in `.env.example`**. Never
   list `OBJECT_STORAGE_BUCKET` there — the platform injects it, and a declaration is silently
@@ -14,12 +17,17 @@ exports.
 - **Time-limited signed URLs.** The app can mint short-lived URLs that let a browser download
   or upload straight into the bucket without the bytes passing through your pod — and without
   a credential in the link.
-- **Isolation the platform enforces.** An app can reach its own bucket and no other. Buckets
-  can never be made public: `make_public()` and ACL calls **fail** — that failure is the
-  platform working, not a bug to route around.
+- **Isolation the platform enforces.** An app reaches its own environment's bucket and no
+  other — not another app's, and not another environment of its own. Buckets can never be
+  made public: `make_public()` and ACL calls **fail** — that failure is the platform working,
+  not a bug to route around.
 - **Durable storage.** Files survive redeploys, rollbacks and manifest edits. Removing the
   `object-storage` declaration does NOT delete the bucket — the deploy just warns. The bucket
-  is deleted only after the whole app is deleted, and after a grace period.
+  is deleted only after the app or the environment is deleted, and after a grace period.
+- **A new environment starts EMPTY.** Creating `staging`, or taking an app live, gives that
+  environment a fresh bucket — nothing is copied from a sibling, exactly as its database is
+  not. Read `OBJECT_STORAGE_BUCKET`; never hard-code a bucket name, and never assume a key
+  that exists in one environment exists in another.
 
 It is plain Google Cloud Storage, so **any language works** — use whatever GCS client your
 stack has and let it pick up Application Default Credentials.
@@ -38,6 +46,10 @@ services:
 That is the whole declaration — it takes **no options** (`persistent` applies only to the pod
 services, and the bucket is durable regardless). `OBJECT_STORAGE_BUCKET` appears in the app's
 environment on the next deploy.
+
+One manifest covers every environment: each one the app is deployed to provisions its own
+bucket on its first deploy that declares the service, and `OBJECT_STORAGE_BUCKET` carries
+that environment's name.
 
 ## Reading and writing
 

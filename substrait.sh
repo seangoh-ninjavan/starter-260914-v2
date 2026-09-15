@@ -31,11 +31,11 @@ if [ "${_SUBSTRAIT_INNER:-}" != "1" ]; then
   export _SUBSTRAIT_INNER=1
   if [ -t 1 ]; then
     # Real terminal — stream live AND keep a log
-    bash "$0" "$@" 2>&1 | tee "$_SUBSTRAIT_LOG"
+    "$0" "$@" 2>&1 | tee "$_SUBSTRAIT_LOG"
     exit ${PIPESTATUS[0]}
   else
     # Piped (IDE runner) — capture to file, immune to broken pipes
-    bash "$0" "$@" > "$_SUBSTRAIT_LOG" 2>&1
+    "$0" "$@" > "$_SUBSTRAIT_LOG" 2>&1
     _rc=$?
     cat "$_SUBSTRAIT_LOG" 2>/dev/null
     exit $_rc

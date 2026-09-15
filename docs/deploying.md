@@ -110,6 +110,47 @@ bash substrait.sh link create --name <app-name> --repo OWNER/REPO
 
 See `docs/linking.md` for the full creation ladder.
 
+## Deploy environments
+
+An app can have more than one **deploy environment** — `production` (the default) plus e.g.
+`staging` or `dev`, each with its own namespace, database, URL, variables and access settings.
+Environments are created on the app's page in the portal (the environment switcher under the
+header).
+
+```bash
+bash substrait.sh deploy --env staging          # deploy to staging instead of production
+```
+
+- The same folder deploys to any environment — nothing in the code changes. The app can read
+  `SUBSTRAIT_ENV` (`production` | `preview`), `SUBSTRAIT_ENV_NAME` and `APP_URL` at runtime.
+- Each environment has its **own** env vars and secrets. Use `--env <name>` with the env
+  command too: `bash substrait.sh env --env staging list`. Creating an environment in the
+  portal copies production's non-secret variables; secrets are never copied, so set them per
+  environment.
+- A **protected** environment (production by default) accepts deploys and variable edits only
+  from the app owner or an admin.
+- To pin a folder to an environment for every command, add `"environment": "staging"` to
+  `.substrait/config.json`. `--env` always wins.
+
+### Promote
+
+Push a build from one environment to another without rebuilding:
+
+```bash
+bash substrait.sh deploy promote --to production --from staging
+```
+
+The target's database is migrated from that build's tree first, then its images are copied
+and rolled out. The target must have been deployed at least once. A protected target
+(production by default) accepts promote only from the app owner or an admin.
+
+### Seed SQL
+
+A file at `backend/db/seed.sql` is applied to **non-production** environments only — on the
+first deploy, again only when the file changes, and again on the first deploy after a database
+reset. Production is never seeded. Use it for test data, demo accounts, or lookup tables that
+staging needs but production fills from real sources.
+
 ## `bash substrait.sh check`
 
 Run before every deploy. Exit 0 = compliant, exit 1 = problems. It reports all of these:
@@ -121,8 +162,9 @@ Run before every deploy. Exit 0 = compliant, exit 1 = problems. It reports all o
 - a `k8s/` directory is present
 
 **A green check is not a deploy guarantee.** The server runs additional checks: an nginx
-backend base image, unresolvable `COPY` paths, the two banned DDL shapes, and a changed
-database engine are all rejected server-side.
+backend base image, unresolvable `COPY` paths, the two banned DDL shapes, a changed
+database engine, and a frontend nginx config that proxies to a compose-style hostname (see
+`docs/frontend.md`) are all rejected server-side.
 
 ---
 

@@ -52,7 +52,7 @@ plain language, and never ask them to open a terminal and type.
 | Add torch or heavy ML packages | `docs/heavy-packages.md` |
 | Build user-identity features | `docs/identity-sso.md` |
 | Link this project to Substrait | `docs/linking.md` |
-| Deploy (commit → push → deploy) | `docs/deploying.md` |
+| Deploy (commit → push → deploy), environments, promote | `docs/deploying.md` |
 | Add a frontend | `docs/frontend.md` |
 | Run the app locally for testing | `docs/running-locally.md` |
 | Create a GitHub repository | `docs/github-repo-creation.md` |
@@ -122,6 +122,10 @@ bash substrait.sh deploy
 ```
 
 **Keep `openapi.json` current** — update it whenever you add, remove, or rename an API route.
+
+**Deploy to a non-production environment:** `bash substrait.sh deploy --env staging`. Each
+environment has its own database, bucket, URL, and env vars. Read `docs/deploying.md` for
+environments, promote, and seed SQL.
 
 **If the deploy says this folder isn't linked**, run the linking ladder above — don't start
 a login flow. Read `docs/deploying.md` for the full error table, the check command, and
