@@ -9,8 +9,9 @@ Substrait contract requirements:
 
 from datetime import datetime, timezone
 import json
+import os
 import threading
-from typing import List, Optional
+from typing import Any, List, Optional
 import uuid
 
 from fastapi import FastAPI, HTTPException, Query, Request
@@ -86,12 +87,31 @@ class NoteCreate(BaseModel):
     author: Optional[str] = None
 
 
+class BridgePush(BaseModel):
+    rows: list[dict[str, Any]] = Field(default_factory=list)
+    request_id: str = Field(default_factory=lambda: str(uuid.uuid4())[:8])
+
+
+class GatewayAsk(BaseModel):
+    prompt: str
+    token: str
+
+
+class GatewayTokenConfig(BaseModel):
+    token: str
+    daily_cap: int = 20
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # In-Memory Thread-Safe Data Store
 # ─────────────────────────────────────────────────────────────────────────────
 
 _lock = threading.Lock()
 _leads: dict[str, Lead] = {}
+_bridge_rows: list[dict[str, Any]] = []
+_bridge_pending: list[dict[str, Any]] = []
+_gateway_log: list[dict[str, Any]] = []
+_gateway_counts: dict[str, dict[str, int | str]] = {}
 
 
 def _seed_demo_data():
@@ -214,6 +234,26 @@ def _seed_demo_data():
 
 _seed_demo_data()
 
+
+def _bearer_token(request: Request) -> str:
+    auth = request.headers.get("authorization", "")
+    if auth.lower().startswith("bearer "):
+        return auth.split(" ", 1)[1].strip()
+    return ""
+
+
+def _require_secret(request: Request, env_name: str):
+    expected = os.getenv(env_name, "")
+    token = _bearer_token(request)
+    if not expected:
+        raise HTTPException(status_code=503, detail=f"{env_name} is not configured")
+    if token != expected:
+        raise HTTPException(status_code=401, detail="Invalid bearer token")
+
+
+def _today_sg() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
 # ─────────────────────────────────────────────────────────────────────────────
 # API Endpoints
 # ─────────────────────────────────────────────────────────────────────────────
@@ -234,6 +274,85 @@ def info(request: Request):
         "server_time": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
         "user": {"email": user_email, "name": user_name},
     }
+
+
+@app.post("/api/bridge/push-rows", tags=["session4"])
+def bridge_push_rows(payload: BridgePush, request: Request):
+    _require_secret(request, "SESSION4_SHARED_SECRET")
+    received_at = datetime.now(timezone.utc).isoformat()
+    accepted = []
+    with _lock:
+        for row in payload.rows[:50]:
+            item = {
+                "id": str(uuid.uuid4())[:8],
+                "request_id": payload.request_id,
+                "received_at": received_at,
+                "row": row,
+            }
+            _bridge_rows.append(item)
+            accepted.append(item)
+            if row.get("email_to") or row.get("write_back"):
+                _bridge_pending.append(
+                    {
+                        "id": item["id"],
+                        "type": "email" if row.get("email_to") else "write_back",
+                        "row": row,
+                        "created_at": received_at,
+                    }
+                )
+    return {"ok": True, "accepted": len(accepted), "request_id": payload.request_id}
+
+
+@app.get("/api/bridge/pending", tags=["session4"])
+def bridge_pending(request: Request):
+    _require_secret(request, "SESSION4_SHARED_SECRET")
+    with _lock:
+        pending = list(_bridge_pending)
+        _bridge_pending.clear()
+    return {"ok": True, "items": pending}
+
+
+@app.post("/api/gateway/configure-token", tags=["session4"])
+def gateway_configure_token(payload: GatewayTokenConfig, request: Request):
+    _require_secret(request, "SESSION4_ADMIN_TOKEN")
+    with _lock:
+        _gateway_counts[payload.token] = {"date": _today_sg(), "count": 0, "cap": payload.daily_cap}
+    return {"ok": True, "token_suffix": payload.token[-4:], "daily_cap": payload.daily_cap}
+
+
+@app.post("/api/gateway/ask", tags=["session4"])
+def gateway_ask(payload: GatewayAsk, request: Request):
+    key_configured = bool(os.getenv("GEMINI_API_KEY"))
+    today = _today_sg()
+    with _lock:
+        entry = _gateway_counts.setdefault(payload.token, {"date": today, "count": 0, "cap": 20})
+        if entry["date"] != today:
+            entry["date"] = today
+            entry["count"] = 0
+        if int(entry["count"]) >= int(entry["cap"]):
+            raise HTTPException(status_code=429, detail="Daily cap exceeded for token")
+        entry["count"] = int(entry["count"]) + 1
+        log_item = {
+            "token_suffix": payload.token[-4:],
+            "prompt_chars": len(payload.prompt),
+            "key_configured": key_configured,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+        _gateway_log.append(log_item)
+    if not key_configured:
+        raise HTTPException(status_code=503, detail="GEMINI_API_KEY is not configured")
+    return {
+        "ok": True,
+        "answer": "Gemini call would run here with the configured secret key.",
+        "usage": {"today": entry["count"], "daily_cap": entry["cap"]},
+    }
+
+
+@app.get("/api/gateway/log", tags=["session4"])
+def gateway_log(request: Request):
+    _require_secret(request, "SESSION4_ADMIN_TOKEN")
+    with _lock:
+        return {"ok": True, "items": list(_gateway_log[-50:])}
 
 
 @app.get("/api/leads", response_model=List[Lead], tags=["leads"])
