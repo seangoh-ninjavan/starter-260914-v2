@@ -12,6 +12,8 @@ import json
 import os
 import threading
 from typing import Any, List, Optional
+import urllib.error
+import urllib.request
 import uuid
 
 from fastapi import FastAPI, HTTPException, Query, Request
@@ -322,7 +324,8 @@ def gateway_configure_token(payload: GatewayTokenConfig, request: Request):
 
 @app.post("/api/gateway/ask", tags=["session4"])
 def gateway_ask(payload: GatewayAsk, request: Request):
-    key_configured = bool(os.getenv("GEMINI_API_KEY"))
+    api_key = os.getenv("GEMINI_API_KEY", "")
+    key_configured = bool(api_key)
     today = _today_sg()
     with _lock:
         entry = _gateway_counts.setdefault(payload.token, {"date": today, "count": 0, "cap": 20})
@@ -341,9 +344,47 @@ def gateway_ask(payload: GatewayAsk, request: Request):
         _gateway_log.append(log_item)
     if not key_configured:
         raise HTTPException(status_code=503, detail="GEMINI_API_KEY is not configured")
+    body = json.dumps(
+        {
+            "contents": [
+                {
+                    "role": "user",
+                    "parts": [{"text": payload.prompt[:4000]}],
+                }
+            ]
+        }
+    ).encode("utf-8")
+    url = (
+        "https://generativelanguage.googleapis.com/v1beta/models/"
+        "gemini-flash-latest:generateContent?key="
+        + api_key
+    )
+    req = urllib.request.Request(
+        url,
+        data=body,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=20) as response:
+            gemini_payload = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        error_body = exc.read().decode("utf-8", errors="replace")[:1000]
+        raise HTTPException(
+            status_code=502,
+            detail={"gemini_status": exc.code, "gemini_error": error_body},
+        ) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Gemini request failed: {exc}") from exc
+    answer = (
+        gemini_payload.get("candidates", [{}])[0]
+        .get("content", {})
+        .get("parts", [{}])[0]
+        .get("text", "")
+    )
     return {
         "ok": True,
-        "answer": "Gemini call would run here with the configured secret key.",
+        "answer": answer,
         "usage": {"today": entry["count"], "daily_cap": entry["cap"]},
     }
 
