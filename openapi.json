@@ -199,6 +199,45 @@
         }
       }
     },
+    "/api/caller/gateway-smoke": {
+      "post": {
+        "tags": [
+          "session4"
+        ],
+        "summary": "Caller Gateway Smoke",
+        "operationId": "caller_gateway_smoke_api_caller_gateway_smoke_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GatewayRelay"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/leads": {
       "get": {
         "tags": [
@@ -565,6 +604,22 @@
           "token"
         ],
         "title": "GatewayAsk"
+      },
+      "GatewayRelay": {
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "title": "Prompt",
+            "default": "Reply with exactly SESSION4_CROSS_APP_OK"
+          },
+          "token": {
+            "type": "string",
+            "title": "Token",
+            "default": "session4-cross-app-smoke"
+          }
+        },
+        "type": "object",
+        "title": "GatewayRelay"
       },
       "GatewayTokenConfig": {
         "properties": {

@@ -104,6 +104,11 @@ class GatewayTokenConfig(BaseModel):
     daily_cap: int = 20
 
 
+class GatewayRelay(BaseModel):
+    prompt: str = "Reply with exactly SESSION4_CROSS_APP_OK"
+    token: str = "session4-cross-app-smoke"
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # In-Memory Thread-Safe Data Store
 # ─────────────────────────────────────────────────────────────────────────────
@@ -354,9 +359,11 @@ def gateway_ask(payload: GatewayAsk, request: Request):
             ]
         }
     ).encode("utf-8")
+    model = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
     url = (
         "https://generativelanguage.googleapis.com/v1beta/models/"
-        "gemini-flash-latest:generateContent?key="
+        + model
+        + ":generateContent?key="
         + api_key
     )
     req = urllib.request.Request(
@@ -394,6 +401,38 @@ def gateway_log(request: Request):
     _require_secret(request, "SESSION4_ADMIN_TOKEN")
     with _lock:
         return {"ok": True, "items": list(_gateway_log[-50:])}
+
+
+@app.post("/api/caller/gateway-smoke", tags=["session4"])
+def caller_gateway_smoke(payload: GatewayRelay):
+    target_url = os.getenv(
+        "SESSION4_GATEWAY_URL",
+        "https://substrait-starter--dev.ninjavan.apps.substrait.build/api/gateway/ask",
+    )
+    body = json.dumps({"prompt": payload.prompt, "token": payload.token}).encode("utf-8")
+    req = urllib.request.Request(
+        target_url,
+        data=body,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=25) as response:
+            response_body = response.read().decode("utf-8", errors="replace")
+            return {
+                "ok": True,
+                "target_status": response.status,
+                "target_body": json.loads(response_body),
+            }
+    except urllib.error.HTTPError as exc:
+        error_body = exc.read().decode("utf-8", errors="replace")[:1000]
+        return {
+            "ok": False,
+            "target_status": exc.code,
+            "target_body": error_body,
+        }
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Gateway relay failed: {exc}") from exc
 
 
 @app.get("/api/leads", response_model=List[Lead], tags=["leads"])
