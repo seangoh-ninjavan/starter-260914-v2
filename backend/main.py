@@ -96,7 +96,7 @@ class BridgePush(BaseModel):
 
 class GatewayAsk(BaseModel):
     prompt: str
-    token: str
+    token: str = ""
 
 
 class GatewayTokenConfig(BaseModel):
@@ -330,10 +330,18 @@ def gateway_configure_token(payload: GatewayTokenConfig, request: Request):
 @app.post("/api/gateway/ask", tags=["session4"])
 def gateway_ask(payload: GatewayAsk, request: Request):
     api_key = os.getenv("GEMINI_API_KEY", "")
+    caller_key = _bearer_token(request)
+    expected_caller_key = os.getenv("SESSION4_GATEWAY_API_KEY", "")
+    if not expected_caller_key:
+        raise HTTPException(status_code=503, detail="SESSION4_GATEWAY_API_KEY is not configured")
+    if caller_key != expected_caller_key:
+        raise HTTPException(status_code=401, detail="Invalid gateway API key")
+    caller_id = request.headers.get("X-Caller-App", "unknown-caller")[:80]
+    caller_token = payload.token or caller_key
     key_configured = bool(api_key)
     today = _today_sg()
     with _lock:
-        entry = _gateway_counts.setdefault(payload.token, {"date": today, "count": 0, "cap": 20})
+        entry = _gateway_counts.setdefault(caller_token, {"date": today, "count": 0, "cap": 20})
         if entry["date"] != today:
             entry["date"] = today
             entry["count"] = 0
@@ -341,7 +349,8 @@ def gateway_ask(payload: GatewayAsk, request: Request):
             raise HTTPException(status_code=429, detail="Daily cap exceeded for token")
         entry["count"] = int(entry["count"]) + 1
         log_item = {
-            "token_suffix": payload.token[-4:],
+            "caller": caller_id,
+            "token_suffix": caller_token[-4:],
             "prompt_chars": len(payload.prompt),
             "key_configured": key_configured,
             "created_at": datetime.now(timezone.utc).isoformat(),
@@ -409,11 +418,18 @@ def caller_gateway_smoke(payload: GatewayRelay):
         "SESSION4_GATEWAY_URL",
         "https://substrait-starter--dev.ninjavan.apps.substrait.build/api/gateway/ask",
     )
+    gateway_api_key = os.getenv("SESSION4_GATEWAY_API_KEY", "")
+    if not gateway_api_key:
+        raise HTTPException(status_code=503, detail="SESSION4_GATEWAY_API_KEY is not configured")
     body = json.dumps({"prompt": payload.prompt, "token": payload.token}).encode("utf-8")
     req = urllib.request.Request(
         target_url,
         data=body,
-        headers={"Content-Type": "application/json"},
+        headers={
+            "Authorization": f"Bearer {gateway_api_key}",
+            "Content-Type": "application/json",
+            "X-Caller-App": os.getenv("SUBSTRAIT_APP_SLUG", "starter-260914-v2"),
+        },
         method="POST",
     )
     try:
