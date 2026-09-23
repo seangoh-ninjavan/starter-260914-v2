@@ -44,6 +44,161 @@
         }
       }
     },
+    "/api/bridge/push-rows": {
+      "post": {
+        "tags": [
+          "session4"
+        ],
+        "summary": "Bridge Push Rows",
+        "operationId": "bridge_push_rows_api_bridge_push_rows_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BridgePush"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/bridge/pending": {
+      "get": {
+        "tags": [
+          "session4"
+        ],
+        "summary": "Bridge Pending",
+        "operationId": "bridge_pending_api_bridge_pending_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/gateway/configure-token": {
+      "post": {
+        "tags": [
+          "session4"
+        ],
+        "summary": "Gateway Configure Token",
+        "operationId": "gateway_configure_token_api_gateway_configure_token_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GatewayTokenConfig"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/gateway/ask": {
+      "post": {
+        "tags": [
+          "session4"
+        ],
+        "summary": "Gateway Ask",
+        "operationId": "gateway_ask_api_gateway_ask_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GatewayAsk"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/gateway/log": {
+      "get": {
+        "tags": [
+          "session4"
+        ],
+        "summary": "Gateway Log",
+        "operationId": "gateway_log_api_gateway_log_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/leads": {
       "get": {
         "tags": [
@@ -375,6 +530,60 @@
   },
   "components": {
     "schemas": {
+      "BridgePush": {
+        "properties": {
+          "rows": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "request_id": {
+            "type": "string",
+            "title": "Request Id"
+          }
+        },
+        "type": "object",
+        "title": "BridgePush"
+      },
+      "GatewayAsk": {
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "title": "Prompt"
+          },
+          "token": {
+            "type": "string",
+            "title": "Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "prompt",
+          "token"
+        ],
+        "title": "GatewayAsk"
+      },
+      "GatewayTokenConfig": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "title": "Token"
+          },
+          "daily_cap": {
+            "type": "integer",
+            "title": "Daily Cap",
+            "default": 20
+          }
+        },
+        "type": "object",
+        "required": [
+          "token"
+        ],
+        "title": "GatewayTokenConfig"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
